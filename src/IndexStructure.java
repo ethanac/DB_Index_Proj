@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.lang.Math;
 import java.util.HashMap;
+import java.util.Scanner;
 
 import org.clapper.util.misc.FileHashMap;
 import org.clapper.util.misc.ObjectExistsException;
@@ -22,27 +23,37 @@ public class IndexStructure {
 	private final static int BUCKET_SIZE = 3; //bucket age size	
 	private final static int TOTAL_BUCKETS = (MAX_AGE - MIN_AGE) / BUCKET_SIZE + 1; //total buckets
 	private static File path = new File("");
-	private final static String INDEX_FILE = path.getAbsolutePath() + "/src/index";
-	private final static String VALUE_SIZE = path.getAbsolutePath() + "/src/value_size";
 	private final static String OFFSETS = path.getAbsolutePath() + "/src/offsets";
 	private final static String IN_FILE = path.getAbsolutePath() + "/src/mymap";
 	private FileHashMap < Integer, ArrayList < BigInteger >> indexStructure;
-	private ArrayList<String> mapArray = new ArrayList<String>();
+	//private ArrayList<String> mapArray = new ArrayList<String>();
 	/**
 	 * This array list contains the offset of each bucket.
 	 * int[0] means the start position of the middle number, int[1] means the ending position.
 	 */
 	public ArrayList<int[]> offsetArray = new ArrayList<int[]>();
-	private ArrayList<Integer> keyArray = new ArrayList<Integer>(TOTAL_BUCKETS); 
+	//private ArrayList<Integer> keyArray = new ArrayList<Integer>(TOTAL_BUCKETS); 
 	
 	public IndexStructure(int option) throws IOException, ObjectExistsException, ClassNotFoundException, VersionMismatchException {
-		indexStructure = new FileHashMap < Integer, ArrayList < BigInteger >> (IN_FILE,option);
 		for(int i=0; i<TOTAL_BUCKETS; i++){
 			int[] init = {0,0};
 			offsetArray.add(init);
-			keyArray.add(0);
-			mapArray.add(" ");
 		}
+		if(option == FileHashMap.FORCE_OVERWRITE){
+			indexStructure = new FileHashMap < Integer, ArrayList < BigInteger >> (IN_FILE, option);
+		}
+		else{
+			indexStructure = new FileHashMap < Integer, ArrayList < BigInteger >> (IN_FILE, 0);
+			Scanner sc = new Scanner(new File(OFFSETS));
+		
+			for(int i=0; i< TOTAL_BUCKETS; i++){
+				int[] tmp ={0,0};
+				tmp[0] = sc.nextInt();
+				tmp[1] = sc.nextInt();
+				offsetArray.set(i, tmp);
+			}
+			sc.close();
+		}	
 	}
 
 	public int extractAge(Record record) {
@@ -53,6 +64,7 @@ public class IndexStructure {
 	public FileHashMap <Integer, ArrayList<BigInteger>> getMap(){
 		return indexStructure;
 	}
+	
 	public void insertToIndex(Record record) {
 		ArrayList < BigInteger > recordsList;
 //		int age = extractAge(record);
@@ -89,43 +101,30 @@ public class IndexStructure {
 	public String getIndexStructure() throws FileNotFoundException {
 		String result = "";
 		for (HashMap.Entry<Integer, ArrayList < BigInteger >> struct : indexStructure.entrySet()) {
-//		  	result += struct.getKey() +":"+struct.getValue() + "\n";
-			mapArray.set(struct.getKey(), ""+struct.getValue());
-			keyArray.set(struct.getKey(), struct.getValue().size());
+		  	result += struct.getKey() +":"+struct.getValue() + "\n";
+		}
 
-		}
-		try (PrintStream out = new PrintStream(new FileOutputStream(VALUE_SIZE))) {
-			for(int i=0; i<keyArray.size(); i++){
-				if(i<keyArray.size()-1)
-					out.print(keyArray.get(i)+",");
-				else
-					out.print(keyArray.get(i));
-			}
-		}
-		for(int i = 0; i<mapArray.size(); i++){	
-			result += mapArray.get(i)+"\n";
-		}
 		// remove all white spaces from index file to reduce size further (10kb saved)
 		return result.replace(" ","").replace("[","").replace("]", "");
 	}
 
 	// ISSUE: what if we choose an age in the middle of the bucket
 	// IDEA: should keep track of where the two offsets are in the list e.g. ages 18-20, keep offset of where 19 starts
-	public ArrayList < BigInteger > getRecordsbyAge(int age1, int age2) {
-		ArrayList < BigInteger > list = new ArrayList < BigInteger > ();
-		ArrayList < BigInteger > list1 = new ArrayList < BigInteger > ();
-		if (age1 > age2)
-//			return "Age can't be bigger";
-			return list;
-		list = indexStructure.get(ageToKey(age1));
-		list1 = indexStructure.get(ageToKey(age2));
-		ArrayList < BigInteger > resultList = new ArrayList < > (list.size() + list1.size());
-		resultList.addAll(list);
-		resultList.addAll(list1);
-
-		// TODO: returns a list of student ids from offsets of the records with that specific age (given by resultList)
-		return resultList;
-	}
+//	public ArrayList < BigInteger > getRecordsbyAge(int age1, int age2) {
+//		ArrayList < BigInteger > list = new ArrayList < BigInteger > ();
+//		ArrayList < BigInteger > list1 = new ArrayList < BigInteger > ();
+//		if (age1 > age2)
+////			return "Age can't be bigger";
+//			return list;
+//		list = indexStructure.get(ageToKey(age1));
+//		list1 = indexStructure.get(ageToKey(age2));
+//		ArrayList < BigInteger > resultList = new ArrayList < > (list.size() + list1.size());
+//		resultList.addAll(list);
+//		resultList.addAll(list1);
+//
+//		// TODO: returns a list of student ids from offsets of the records with that specific age (given by resultList)
+//		return resultList;
+//	}
 
 	public String showList(ArrayList < BigInteger > list) {
 		String listString = "";
@@ -135,54 +134,40 @@ public class IndexStructure {
 		return listString;
 	}
 	
-//	private String getOffSet(){
-//		String offsets = "";
-//		for(int i=0; i<offsetArray.size(); i++){
-//			if(i == offsetArray.size()-1)
-//				offsets += (offsetArray.get(i)[0]+","+offsetArray.get(i)[1]);
-//			else
-//				offsets += (offsetArray.get(i)[0]+","+offsetArray.get(i)[1]+";");
-//		}
-//		return offsets.replace(" ", "").replace("[", "").replace("]","");
-//	}
-	
 	public void saveIndexStructure() throws IOException {
 //		try (PrintStream out = new PrintStream(new FileOutputStream(INDEX_FILE))) {
 //			out.print(this.getIndexStructure());
 //		}
-//		try (PrintStream out = new PrintStream(new FileOutputStream(OFFSETS))) {
-//			out.print(this.getOffSet());
-//		}
+		try (PrintStream out = new PrintStream(new FileOutputStream(OFFSETS))) {
+			for(int i=0; i<offsetArray.size(); i++){
+				out.print(offsetArray.get(i)[0]);
+				out.print("\n");
+				out.print(offsetArray.get(i)[1]);
+				out.print("\n");
+			}
+		}
+		
 		this.indexStructure.save();
 		File indexf = new File(IN_FILE+".ix");
-		if(indexf.exists()){
+		File dbf = new File(IN_FILE+".db");
+		File offsets = new File(OFFSETS);
+		if(indexf.exists() && dbf.exists() && offsets.exists()){
 			System.out.println("Successfully saved");
 		}
-//		File file = new File(INDEX_FILE);
-//        FileOutputStream f = new FileOutputStream(file);
-//        ObjectOutputStream s = new ObjectOutputStream(f);
-//        s.writeObject(indexStructure);
-//        s.close();
+
 	}
-	
-//	public void loadIndexStructure() throws IOException, ClassNotFoundException {
-//			File file = new File(INDEX_FILE);
-//			FileInputStream f = new FileInputStream(file);
-//		    ObjectInputStream s = new ObjectInputStream(f);
-//		    indexStructure = (FileHashMap<Integer, ArrayList<BigInteger>>) s.readObject();
-//		    s.close();
-//	}
 	
 	public boolean exists(){
 		File indexfile = new File(IN_FILE+".ix");
 		File dbfile = new File(IN_FILE+".db");
-//		File oFile = new File(OFFSETS);
-		return (indexfile.exists() && dbfile.exists());
+		File oFile = new File(OFFSETS);
+		return (indexfile.exists() && dbfile.exists() && oFile.exists());
 	}
 	
 	public int size(){
 		File indexfile = new File(IN_FILE+".ix");
 		File dbfile = new File(IN_FILE+".db");
-		return (int) indexfile.length() + (int) dbfile.length();
+		File offsets = new File(OFFSETS);
+		return (int) indexfile.length() + (int) dbfile.length() + (int) offsets.length();
 	}
 }
