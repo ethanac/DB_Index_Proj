@@ -1,31 +1,16 @@
+
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Scanner;
-
-import org.clapper.util.misc.FileHashMap;
-import org.clapper.util.misc.ObjectExistsException;
-import org.clapper.util.misc.VersionMismatchException;
-
-import java.io.File;
 
 public class Demo {
 	
-	public static void main(String[] args) throws IOException, ObjectExistsException, ClassNotFoundException, VersionMismatchException {
+	public static void main(String[] args) throws IOException {
 		// TODO Auto-generated method stub
-	
-		ParseFile test = new ParseFile();
-		ArrayList<Record> list = new ArrayList<Record>();
-		IndexStructure indexStructure;
-		File path = new File("");
-		
-		String datafile = path.getAbsolutePath()+"/src/person.txt";
-		String IN_FILE = path.getAbsolutePath() + "/src/mymap";
-		String OFFSETS = path.getAbsolutePath() + "/src/offsets";
-		
-		File indexfile = new File(IN_FILE+".ix");
-		File offsets = new File(OFFSETS);
-		
-		ArrayList<String> result = new ArrayList<String>();
+		final int MIN_AGE = 18;
+		final int MAX_AGE = 99;
+		ParseFile parseFile = new ParseFile();
+		FHashmap index = new FHashmap();
+
 		int startingAge = 0;
 		int endingAge = 0;
 		long startingTime = 0;
@@ -35,36 +20,33 @@ public class Demo {
 		 * Initialize the index structure.
 		 */
 		startingTime = System.currentTimeMillis();
-		//IMPROVEMENT: compare md5 of data file if different than before, the ncompute index file
-		if(!indexfile.exists() || !offsets.exists()){
+		if(!index.exists()){
 			System.out.println("Please wait while the Index File is being built...");
-			list = test.getParsedFile();
-			indexStructure = new IndexStructure(FileHashMap.FORCE_OVERWRITE);
-
-			for(int i = 0; i < list.size(); i++){
-				indexStructure.insertToIndex(list.get(i));
-			}
-			indexStructure.saveIndexStructure();
+			//parseFile.getParsedFile(index);
+			//index.flush();
+			MergerFiles.merge();
+			//System.out.println("\nThe average income is: " + index.incomeSum/index.number);			
 		}
 		else{
-			indexStructure = new IndexStructure(FileHashMap.NO_CREATE);
+			MergerFiles.getOffsets();
 		}
+		
 		endingTime = System.currentTimeMillis();
 		System.out.println("Index File Build Successfully in " + (endingTime-startingTime)/1000 + "s");
-		System.out.println("Index File Size: " + indexStructure.size() + " Bytes.");
+		System.out.println("Index File Size: " + index.getSize() + " Bytes.");
 		
 		/*
 		 * Get the input from user in a loop.
 		 */
 		Scanner sc = new Scanner(System.in);
 		do{
-			System.out.println("Please enter the starting age: ");
+			System.out.println("Please enter the starting age: ( enter -1 when you want to exit. )");
 			startingAge = sc.nextInt();
 		
 			if(startingAge == -1)
 				break;
 		
-		if(startingAge < 18 || startingAge > 99){
+		if(startingAge < MIN_AGE || startingAge > MAX_AGE){
 				System.out.println("Error: starting age must be greater than 17 and less than 100!");
 				continue;
 			}
@@ -74,7 +56,7 @@ public class Demo {
 			startingTime = System.currentTimeMillis();
 			System.out.println(startingTime);
 		
-			if(endingAge >99 || endingAge < 18){
+			if(endingAge > MAX_AGE || endingAge < MIN_AGE){
 				System.out.println("Error: ending age must be less than 100 and greater than 17!");
 				continue;
 			}
@@ -83,18 +65,11 @@ public class Demo {
 				continue;
 			}
 			else{
-				result = test.getRecordsByAge(datafile, indexStructure, startingAge, endingAge);
-				
-				long resultSize = result.size();
+				parseFile.getRecordByAge(startingAge, endingAge);
 				endingTime = System.currentTimeMillis();
-				
-				for(int i = 0; i < result.size(); i++){
-					System.out.println(result.get(i));
-				}
 				
 				System.out.println(endingTime);
 				System.out.println("Searching the file takes: " + (endingTime-startingTime) + " milliseconds.");
-				System.out.println("\nTotal Records Found: "+ resultSize);
 				System.out.println("Index File Search Time: " + (endingTime-startingTime)+ " ms");
 				continue;
 			}	
