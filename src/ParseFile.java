@@ -1,16 +1,10 @@
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.math.BigInteger;
-import java.util.ArrayList;
 
-import org.clapper.util.misc.ObjectExistsException;
-import org.clapper.util.misc.VersionMismatchException;
-
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileReader;
 
 
 /**
@@ -20,144 +14,67 @@ import java.io.FileInputStream;
  */
 public class ParseFile {
 	
-	File path = new File("");
-	private final static int MIN_AGE = 18;
-//	private final static int MAX_AGE = 99;
-	private final static int BUCKET_SIZE = 3; //bucket age size	
-	//private final static int TOTAL_BUCKETS = (MAX_AGE - MIN_AGE) / BUCKET_SIZE + 1; //total buckets
-	private String filePath = path.getAbsolutePath()+"/src/person.txt";
+	private final int MIN_AGE = 18;
+	//private final int MAX_AGE = 99;
+	private final int REC_SIZE = 100;
 
-	
-	private int charCounter = 0;
-	private ArrayList<Record> records = new ArrayList<Record>();
+	File path = new File("");
+	private String DATA_FILE = path.getAbsolutePath()+"/src/person.txt";
+	private String INDEX_FILE = path.getAbsolutePath()+"/indexFile";	
+	private long charCounter = 0;
+	public long incomeByAge = 0;
 	
 	public ParseFile(){
 		
 	}
-	public ParseFile(String path){
-		filePath = path;
-	}
 	
 	/**
-	 * Get Records by the given range of age. This method is public.
-	 * @param datafile  The file path of the data file.
-	 * @param is  Index structure created by demo
-	 * @return result  The result we wanted.
-	 * @throws IOException Hehe.
-	 * @throws VersionMismatchException 
-	 * @throws ClassNotFoundException 
-	 * @throws ObjectExistsException 
+	 * Get record by age. It read IDs from index file and passes it to getTargetRecord method.
+	 * @param sAge  Staring age.
+	 * @param eAge  Ending age.
+	 * @throws IOException  IO exception.
 	 */
-	public ArrayList<String> getRecordsByAge(String datafile, IndexStructure istructure, int sAge, int eAge) throws IOException{
-		ArrayList<String> result = new ArrayList<String>();
+	public void getRecordByAge(int sAge, int eAge) throws IOException{
+		RandomAccessFile rad = new RandomAccessFile(DATA_FILE, "r");
+		RandomAccessFile ix = new RandomAccessFile(INDEX_FILE, "r");
 		
-		int startingAge;
-		int endingAge;
-		int startingKey = 0;
-		int startingOffSet = 0;
-		int endingKey = 0;
-		int endingOffSet;
-		int startingPosition = 0;
-		int endingPosition = 0;
-		RandomAccessFile rad = new RandomAccessFile(datafile, "r");	
+		long number = 0;
+		long start = MergerFiles.bucketSizes.get(sAge-MIN_AGE);
+		long end = MergerFiles.bucketSizes.get(eAge-MIN_AGE+1);
+		ix.seek(start+1);  // We made a mistake here before
+		incomeByAge = 0;
 		
-		IndexStructure is = istructure;
-		startingAge = sAge;
-		endingAge = eAge;
-		startingKey = is.ageToKey(startingAge);
-		startingOffSet = (startingAge-MIN_AGE)%BUCKET_SIZE - 1;
-		endingKey = is.ageToKey(endingAge);
-		endingOffSet = (endingAge-MIN_AGE)%BUCKET_SIZE -1;
-		
-		for(int i = startingKey; i < endingKey+1; i++){
-			ArrayList<BigInteger> ids = new ArrayList<BigInteger>();
-			ArrayList<String> tmpRec = new ArrayList<String>();
+		while(ix.getFilePointer() < end){
+			String tmp = ix.readLine();
 			
-			if(istructure != null){
-				if(is.getMap().get(i) == null){
-					continue;
-				}
-				ids = is.getMap().get(i);
-				
-				int[] tmp = getRange(is, ids, i, startingOffSet, endingOffSet, startingKey, endingKey);
-				startingPosition = tmp[0];
-				endingPosition = tmp[1];
-				tmpRec = getTargetRecords(ids, startingPosition, endingPosition, rad);	
+			if(!tmp.equals("")){
+				long id = Integer.parseInt(tmp);
+				getTargetRecord(id, rad);
+				number++;
 			}
-				
-			result.addAll(tmpRec);
 		}
-		return result;
-
+		System.out.println("\n" + number + " records found.");
+		System.out.println("The average income for age from " + sAge + " to " + eAge + " is: "+ incomeByAge/number);
+		ix.close();
 	}
 	
 	/**
-	 * Compute the starting position and ending position for each bucket.
-	 * @param idLength  The size of array list contains IDs.
-	 * @param i  Current key.
-	 * @param startingOffSet
-	 * @param endingOffSet
-	 * @param startingKey
-	 * @param endingKey
-	 * @return
+	 * Get target record from the data file.
+	 * @param id  The position of the target record in the data file.
+	 * @param rad  The data file opened by Random Access File.
+	 * @throws IOException  Throws exception.
 	 */
-	private int[] getRange(IndexStructure is, ArrayList<BigInteger> ids, int i, int startingOffSet, int endingOffSet, int startingKey, int endingKey){
-		int[] p = {0,0};
-		int startingPosition = 0;
-		int endingPosition = ids.size();
-			
-		//For different situation, startingP and endingP are different.
-
-		if(i == startingKey){
-			if(startingOffSet >= 0){
-				startingPosition = is.offsetArray.get(startingKey)[startingOffSet];
-			}
-			else{
-				startingPosition = 0;
-			}
-			p[0] = startingPosition;
-			p[1] = ids.size();
-		}
-		if(i == endingKey){
-			if(endingOffSet < 1){
-				endingPosition = is.offsetArray.get(endingKey)[endingOffSet+1];
-			}
-			else{
-				endingPosition = ids.size();
-			}
-			p[0] = 0;
-			p[1] = endingPosition;
-		}
-		if(i != startingKey && i != endingKey){
-			p[0] = 0;
-			p[1] = ids.size();
-		}
-		return p;
-	}
-	
-	/**
-	 * Get the records from the text file using hash map and random access file.
-	 * @param idArray  All IDs of records that belong to the given range of age.
-	 * @param rad  The data file opened by RAF.
-	 * @return result  A String array list contains all the targets.
-	 * @throws IOException  I have nothing to say here.
-	 */
-	private ArrayList<String> getTargetRecords(ArrayList<BigInteger> idArray, int startingPosition, int endingPosition, RandomAccessFile rad) throws IOException{
-		int k;
+	private void getTargetRecord(long id, RandomAccessFile rad) throws IOException{
+		int income;
 		String record = "";
-		ArrayList<String> result = new ArrayList<String>();
+		byte[] b = new byte[100];
+		rad.seek(id*100);
+		rad.read(b,0,100);
 		
-		for(int i=startingPosition; i<endingPosition; i++){
-			k = idArray.get(i).intValue();
-			byte[] b = new byte[100];
-			rad.seek(k*100);
-			rad.read(b,0,100);
-
-			record = byteToString(b);		
-			result.add(record);
-
-		}
-		return result;
+		record = byteToString(b);
+		income = Integer.parseInt(record.substring(42, 52));
+		incomeByAge += income;
+		//System.out.println(record);
 	}
 	
 	/**
@@ -188,8 +105,8 @@ public class ParseFile {
 	 * 					Each Record object represents a record. 
 	 * @throws IOException
 	 */
-	public ArrayList<Record> getParsedFile() throws IOException{
-		InputStream inputStream = new BufferedInputStream(new FileInputStream(filePath));
+	public void getParsedFile(FHashmap is) throws IOException{
+		FileReader inputStream = new FileReader(DATA_FILE);
 		
 		/**
 		 * An integer to store a character read from the text file.
@@ -198,13 +115,14 @@ public class ParseFile {
 		
 		BigInteger recordCount = new BigInteger("0");
 		String age = "";
+		String income = "";
 		
 		try{
 			
 			while((c=inputStream.read()) != -1){
 				charCounter++;
 				
-				if(charCounter%100 > 39 && charCounter%100 < 42){
+				if(charCounter%REC_SIZE > 39 && charCounter%REC_SIZE < 42){
 					if(c != 32){
 						age += (char)c;
 					}
@@ -212,13 +130,32 @@ public class ParseFile {
 						continue;
 					}
 				}
+				if(charCounter%REC_SIZE > 41 && charCounter%REC_SIZE < 52){
+					if(c != 32){
+						income += (char)c;
+					}
+					else{
+						continue;
+					}
+				}
 
-				if(charCounter%100 == 0){
-					records.add(new Record());
-					records.get(charCounter/100-1).id = recordCount;
-					records.get(charCounter/100-1).age = Integer.parseInt(age);
+				if(charCounter%REC_SIZE == 0){
+					
+					Record r = new Record();
+					r.id = recordCount;
+					if(age.equals(""))
+						continue;
+					r.age = Integer.parseInt(age);
+					
+					if(age.equals(""))
+						r.income = 0;
+					else
+						r.income = Integer.parseInt(income);
+					
+					is.insertToIndex(r);
 
 					age = "";
+					income = "";
 					recordCount = recordCount.add(BigInteger.ONE);
 				}
 			} 
@@ -228,7 +165,5 @@ public class ParseFile {
 	                inputStream.close();
 	            }
 	        }
-
-		return records;
 	}
 }
