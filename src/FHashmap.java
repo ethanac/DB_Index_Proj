@@ -13,8 +13,9 @@ public class FHashmap {
 	private final static int MIN_AGE = 18;
 	private final static int MAX_AGE = 99;
 	private final static int TOTAL_BUCKETS = MAX_AGE-MIN_AGE+1; //total buckets
+	private final static int MAX_SIZE = 3500;
 	private ArrayList<Path> indexFiles = new ArrayList<Path>();
-	private ArrayList<IDList> idList = new ArrayList<IDList>();
+	private SaverList sl = new SaverList();
 	public long incomeSum, number = 0;
 	
 	/*
@@ -30,7 +31,7 @@ public class FHashmap {
 			indexFiles.add(ixfile);
 			if(create)	
 				Files.write(ixfile, "".getBytes(), StandardOpenOption.CREATE);
-			idList.add(new IDList(i));
+			//idList.add(new IDList(i));
 		}
 	}
 	
@@ -38,12 +39,17 @@ public class FHashmap {
 	 * Get the ID of each record an put them into separate files according to the age of the record.
 	 * @param record  One record with ID and age.
 	 * @throws IOException  IO exception.
+	 * @throws InterruptedException 
 	 */
-	public void insertToIndex(Record record) throws IOException {
-
+	public void insertToIndex(Record record) throws IOException, InterruptedException {
+		
 		int index = record.age-MIN_AGE;
-		int id = record.id.intValue();
-		idList.get(index).add(id);
+		int id = record.id;
+		if(sl.saverList.get(index).ids.size() == MAX_SIZE){
+			sl.saverList.get(index).readyToSave();
+		}
+		while(sl.saverList.get(index).full);
+		sl.saverList.get(index).ids.add(id);
 		incomeSum += record.income;
 		number++;
 	}
@@ -51,10 +57,13 @@ public class FHashmap {
 	/**
 	 * Flush all records which are still in the memory to disk.
 	 * @throws IOException
+	 * @throws InterruptedException 
 	 */
-	public void flush() throws IOException{
-		for(IDList l : idList){
+	public void flush() throws IOException, InterruptedException{
+		for(Saver l : sl.saverList){
+			l.readyToSave();
 			l.saveToFile();
+			l.running = false;
 		}
 	}
 	
@@ -77,10 +86,9 @@ public class FHashmap {
 	 */
 	public int getSize(){
 		int size = 0;
-//		for(int i=0; i <= MAX_AGE-MIN_AGE; i++){
-			File indexfile = new File("indexFile");
-			size += (int) indexfile.length();
-//		}
+		File indexfile = new File("indexFile");
+		size += (int) indexfile.length();
+
 		return size;
 	}
 

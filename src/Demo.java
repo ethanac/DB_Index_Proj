@@ -4,7 +4,7 @@ import java.util.Scanner;
 
 public class Demo {
 	
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, InterruptedException {
 		// TODO Auto-generated method stub
 		final int MIN_AGE = 18;
 		final int MAX_AGE = 99;
@@ -22,8 +22,8 @@ public class Demo {
 		startingTime = System.currentTimeMillis();
 		if(!index.exists()){
 			System.out.println("Please wait while the Index File is being built...");
-			//parseFile.getParsedFile(index);
-			//index.flush();
+			parseFile.getParsedFile(index);
+			index.flush();
 			MergerFiles.merge();
 			//System.out.println("\nThe average income is: " + index.incomeSum/index.number);			
 		}

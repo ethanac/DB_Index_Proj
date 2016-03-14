@@ -1,7 +1,7 @@
-import java.math.BigInteger;
+//import java.math.BigInteger;
 
 public class Record {
-	public BigInteger id;
+	public int id;
 	public int age;
 	public int income;
 

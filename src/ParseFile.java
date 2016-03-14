@@ -1,10 +1,9 @@
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.math.BigInteger;
-
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.io.File;
-import java.io.FileReader;
 
 
 /**
@@ -21,7 +20,7 @@ public class ParseFile {
 	File path = new File("");
 	private String DATA_FILE = path.getAbsolutePath()+"/src/person.txt";
 	private String INDEX_FILE = path.getAbsolutePath()+"/indexFile";	
-	private long charCounter = 0;
+//	private long charCounter = 0;
 	public long incomeByAge = 0;
 	
 	public ParseFile(){
@@ -67,9 +66,9 @@ public class ParseFile {
 	private void getTargetRecord(long id, RandomAccessFile rad) throws IOException{
 		int income;
 		String record = "";
-		byte[] b = new byte[100];
-		rad.seek(id*100);
-		rad.read(b,0,100);
+		byte[] b = new byte[REC_SIZE];
+		rad.seek(id*REC_SIZE);
+		rad.read(b,0,REC_SIZE);
 		
 		record = byteToString(b);
 		income = Integer.parseInt(record.substring(42, 52));
@@ -104,66 +103,107 @@ public class ParseFile {
 	 * @return records  Return an array list of Record objects.
 	 * 					Each Record object represents a record. 
 	 * @throws IOException
+	 * @throws InterruptedException 
 	 */
-	public void getParsedFile(FHashmap is) throws IOException{
-		FileReader inputStream = new FileReader(DATA_FILE);
-		
-		/**
-		 * An integer to store a character read from the text file.
-		 */
-		int c;
-		
-		BigInteger recordCount = new BigInteger("0");
-		String age = "";
-		String income = "";
-		
-		try{
-			
-			while((c=inputStream.read()) != -1){
-				charCounter++;
-				
-				if(charCounter%REC_SIZE > 39 && charCounter%REC_SIZE < 42){
-					if(c != 32){
-						age += (char)c;
-					}
-					else{
-						continue;
-					}
-				}
-				if(charCounter%REC_SIZE > 41 && charCounter%REC_SIZE < 52){
-					if(c != 32){
-						income += (char)c;
-					}
-					else{
-						continue;
-					}
-				}
-
-				if(charCounter%REC_SIZE == 0){
-					
-					Record r = new Record();
-					r.id = recordCount;
-					if(age.equals(""))
-						continue;
-					r.age = Integer.parseInt(age);
-					
-					if(age.equals(""))
-						r.income = 0;
-					else
-						r.income = Integer.parseInt(income);
-					
-					is.insertToIndex(r);
-
-					age = "";
-					income = "";
-					recordCount = recordCount.add(BigInteger.ONE);
-				}
-			} 
-		} finally {
-		
-	            if (inputStream != null) {
-	                inputStream.close();
-	            }
-	        }
+	public void getParsedFile(FHashmap is) throws IOException, InterruptedException{
+//		FileReader inputStream = new FileReader(DATA_FILE);
+//		
+//		/**
+//		 * An integer to store a character read from the text file.
+//		 */
+//		int c;
+//		
+//		BigInteger recordCount = new BigInteger("0");
+//		String age = "";
+//		String income = "";
+//		
+//		try{
+//			
+//			while((c=inputStream.read()) != -1){
+//				charCounter++;
+//				
+//				if(charCounter%REC_SIZE > 39 && charCounter%REC_SIZE < 42){
+//					if(c != 32){
+//						age += (char)c;
+//					}
+//					else{
+//						continue;
+//					}
+//				}
+//				if(charCounter%REC_SIZE > 41 && charCounter%REC_SIZE < 52){
+//					if(c != 32){
+//						income += (char)c;
+//					}
+//					else{
+//						continue;
+//					}
+//				}
+//
+//				if(charCounter%REC_SIZE == 0){
+//					
+//					Record r = new Record();
+//					r.id = recordCount;
+//					if(age.equals(""))
+//						continue;
+//					r.age = Integer.parseInt(age);
+//					
+//					if(age.equals(""))
+//						r.income = 0;
+//					else
+//						r.income = Integer.parseInt(income);
+//					
+//					is.insertToIndex(r);
+//
+//					age = "";
+//					income = "";
+//					recordCount = recordCount.add(BigInteger.ONE);
+//				}
+//			} 
+//		} finally {
+//		
+//	            if (inputStream != null) {
+//	                inputStream.close();
+//	            }
+//	        }
+		final int BUFFER_SIZE = 100*1000*10*2+100*1000*5;
+        final int REC_SIZE = 100;
+    	RandomAccessFile aFile = new RandomAccessFile
+                ("/Users/Ethan/Documents/workspace/ix/person.txt", "r");
+        FileChannel inChannel = aFile.getChannel();
+        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+        String age = "";
+        long st = System.currentTimeMillis();
+        long et;
+        int ID = -1;
+        Record r = new Record();
+        
+		while(inChannel.read(buffer) > 0)
+        {
+            buffer.flip();
+            //System.out.println(buffer.limit());
+            for (int i = 0; i < buffer.limit(); i += REC_SIZE)
+            {
+                if(i>buffer.limit()-REC_SIZE){
+                	System.out.println(i);
+                	continue;
+                }
+                ID++;
+                r.id = ID;
+            	age = ""+ (char)buffer.get(i+39) + (char)buffer.get(i+40);
+            	r.age = Integer.parseInt(age);
+            	is.insertToIndex(r);
+            	//System.out.print((char) buffer.get());
+                //System.out.println(s.length());
+            }
+            System.out.println(ID+", "+age);
+            buffer.clear(); // do something with the data and clear/compact it.
+            //buffer.flip();
+            //break;
+        }
+        inChannel.close();
+        aFile.close();
+        et = System.currentTimeMillis();
+        System.out.println("Building time is " + (et-st));
+    
 	}
 }
